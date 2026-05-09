@@ -1,0 +1,36 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: scg-asgn-be
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState
+  metrics:
+    tags:
+      service: ${spring.application.name}
+      version: ${APP_VERSION:dev}
+
+app:
+  version: ${APP_VERSION:dev}
+  pod-name: ${HOSTNAME:local}
+  rollout-color: ${ROLLOUT_COLOR:none}
+
+logging:
+  config: classpath:logback-spring.xml

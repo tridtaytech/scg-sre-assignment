@@ -1,0 +1,20 @@
+# Teaches kustomize how to update name references inside Argo Rollouts CRDs
+# when nameSuffix / namePrefix is applied at the overlay layer.
+nameReference:
+  - kind: Service
+    fieldSpecs:
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/strategy/blueGreen/activeService
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/strategy/blueGreen/previewService
+  - kind: AnalysisTemplate
+    group: argoproj.io
+    fieldSpecs:
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/strategy/blueGreen/prePromotionAnalysis/templates/templateName
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/strategy/blueGreen/postPromotionAnalysis/templates/templateName

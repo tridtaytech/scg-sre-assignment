@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./project/scg-asgn/backend
+    container_name: scg-asgn-be-local
+    environment:
+      APP_VERSION: v0.1.0-local
+      ROLLOUT_COLOR: blue
+      HOSTNAME: scg-asgn-be-local
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./project/scg-asgn/frontend
+    container_name: scg-asgn-fe-local
+    environment:
+      BACKEND_URL: http://backend:8080
+      NEXT_PUBLIC_APP_VERSION: v0.1.0-local
+      ROLLOUT_COLOR: blue
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy

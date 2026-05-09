@@ -1,0 +1,42 @@
+# Helm chart: argo/argo-rollouts
+#
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm upgrade --install argo-rollouts argo/argo-rollouts \
+#     --namespace argo-rollouts --create-namespace \
+#     -f infra/manual/helm/argo-rollouts.yaml
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+  metrics:
+    enabled: true                # /metrics endpoint
+    serviceMonitor:
+      enabled: false             # flip to true after kube-prometheus-stack is installed
+
+# Optional UI dashboard at https://<host>:3100 — port-forward to view
+dashboard:
+  enabled: true
+  replicas: 1
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities

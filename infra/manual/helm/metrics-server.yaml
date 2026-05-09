@@ -1,0 +1,31 @@
+# Helm chart: metrics-server/metrics-server
+#
+# EKS doesn't ship metrics-server by default — HPA and `kubectl top` need it.
+#
+#   helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+#   helm upgrade --install metrics-server metrics-server/metrics-server \
+#     --namespace kube-system \
+#     -f infra/manual/helm/metrics-server.yaml
+
+replicas: 2
+
+nodeSelector:
+  company: scg
+  project: mandatory
+  nodegroup: facilities
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    memory: 400Mi
+
+# EKS-specific: kubelet certs are signed by the cluster CA but the hostname
+# on the cert is the internal IP. The chart already sets this for AWS, but
+# pin it explicitly so it survives chart upgrades.
+defaultArgs:
+  - --cert-dir=/tmp
+  - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+  - --kubelet-use-node-status-port
+  - --metric-resolution=15s

@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: scg-asgn
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+            prune: true
+            selfHeal: true
+          - env: qa
+            prune: true
+            selfHeal: true
+          - env: staging
+            prune: true
+            selfHeal: false      # don't auto-revert manual edits in staging
+          - env: prod
+            prune: false         # never prune in prod
+            selfHeal: false      # surface drift, don't hide it
+  template:
+    metadata:
+      name: 'scg-asgn-{{.env}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: scg-asgn
+      source:
+        repoURL: https://github.com/<OWNER>/scg-sre-assignment.git
+        targetRevision: main
+        path: 'project/scg-asgn/deployment/overlays/{{.env}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'app-{{.env}}'
+      syncPolicy:
+        automated:
+          prune: '{{.prune}}'
+          selfHeal: '{{.selfHeal}}'
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

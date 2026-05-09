@@ -1,0 +1,76 @@
+# Helm chart: argo/argo-cd
+#
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm upgrade --install argocd argo/argo-cd \
+#     --namespace argocd --create-namespace \
+#     -f infra/manual/helm/argocd.yaml
+
+global:
+  domain: argocd.scg-asgn.local   # update once you wire DNS / ingress
+
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+configs:
+  params:
+    # Lets the API server speak plain HTTP behind an Ingress that terminates TLS.
+    # Keep `false` for prod once you front it with a TLS-terminating LB.
+    server.insecure: true
+
+  cm:
+    # Auto-detect kustomize / helm sources, accept any chart from public repos
+    kustomize.buildOptions: "--enable-helm"
+    timeout.reconciliation: 60s
+
+server:
+  replicas: 2
+
+  service:
+    type: ClusterIP            # rely on Ingress; flip to LoadBalancer if you don't have one
+
+  ingress:
+    enabled: false             # turn on once you have NGINX + a hostname picked
+    ingressClassName: nginx
+    hostname: argocd.scg-asgn.local
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Application controller — the workhorse that reconciles Apps
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# Repo server — clones git repos and renders manifests
+repoServer:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# ApplicationSet controller — required for our argocd/managed/applicationset.yaml
+applicationSet:
+  enabled: true
+  replicas: 1
+
+# Notifications — disabled until you wire up Slack/etc
+notifications:
+  enabled: false
+
+# Dex (SSO) — disabled, use the bundled admin user for now
+dex:
+  enabled: false

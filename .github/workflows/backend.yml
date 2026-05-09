@@ -1,0 +1,162 @@
+name: backend
+
+on:
+  push:
+    branches: [main, app-main]
+    paths:
+      - "project/scg-asgn/backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "project/scg-asgn/backend/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (commits the bump that Argo CD will sync)
+        required: true
+        type: choice
+        options: [dev, qa, staging, prod]
+      image_tag:
+        description: Existing image tag to deploy. Leave blank to build a new one from the current commit.
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+# --- ECR mode toggle (see README) ---------------------------------------------
+# vars.ECR_TYPE   = public | private  (default: public)
+# vars.AWS_REGION = ap-southeast-1     (overridden to us-east-1 only when pushing to Public ECR)
+# secrets.ECR_REGISTRY = full registry URL prefix
+# secrets.GITOPS_TOKEN = PAT (or GitHub App token) with contents:write on this repo
+# ------------------------------------------------------------------------------
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECR_TYPE: ${{ vars.ECR_TYPE || 'public' }}
+  SERVICE: backend
+  APP_DIR: project/scg-asgn/backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build + test
+        working-directory: ${{ env.APP_DIR }}
+        run: mvn -B verify
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: ${{ env.APP_DIR }}/target/*.jar
+
+  build-push:
+    needs: test
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == '')
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.ECR_TYPE == 'public' && 'us-east-1' || env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: ${{ env.ECR_TYPE }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build + push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.APP_DIR }}
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.SERVICE }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=${{ env.SERVICE }}
+          cache-to: type=gha,scope=${{ env.SERVICE }},mode=max
+
+  bump-image:
+    # GitOps: instead of `kubectl apply`, commit the image-tag bump back to git.
+    # Argo CD watches the overlay path and syncs the cluster on the next pass.
+    needs: build-push
+    if: |
+      always() &&
+      (needs.build-push.result == 'success' || needs.build-push.result == 'skipped') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gitops-bump-${{ github.event.inputs.environment || 'dev' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITOPS_TOKEN }}
+          fetch-depth: 0
+
+      - uses: imranismail/setup-kustomize@v2
+
+      - name: Resolve env + image tag
+        id: vars
+        run: |
+          ENV="${{ github.event.inputs.environment || 'dev' }}"
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="${{ needs.build-push.outputs.image_tag || github.sha }}"
+            TAG="${TAG:0:12}"
+          fi
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Bump image tag in overlay
+        working-directory: project/scg-asgn/deployment/overlays/${{ steps.vars.outputs.env }}
+        run: |
+          kustomize edit set image \
+            backend:placeholder=$ECR_REGISTRY/${{ env.SERVICE }}:${{ steps.vars.outputs.tag }}
+
+      - name: Commit + push bump
+        env:
+          ENV: ${{ steps.vars.outputs.env }}
+          TAG: ${{ steps.vars.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes — already at tag $TAG"
+            exit 0
+          fi
+          git commit -m "ci(${ENV}): bump ${{ env.SERVICE }} to ${TAG} [skip ci]"
+
+          # Race-safe push: rebase + retry up to 3 times if another bump landed
+          # between our checkout and push.
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "Pushed bump on attempt $i"
+              exit 0
+            fi
+            sleep $((i * 3))
+          done
+          echo "Failed to push bump after 3 retries"
+          exit 1

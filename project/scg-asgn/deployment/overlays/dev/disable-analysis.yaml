@@ -1,0 +1,10 @@
+- op: remove
+  path: /spec/strategy/blueGreen/prePromotionAnalysis
+- op: remove
+  path: /spec/strategy/blueGreen/postPromotionAnalysis
+- op: replace
+  path: /spec/strategy/blueGreen/autoPromotionSeconds
+  value: 60
+- op: replace
+  path: /spec/strategy/blueGreen/scaleDownDelaySeconds
+  value: 60

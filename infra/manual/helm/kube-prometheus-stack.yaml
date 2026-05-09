@@ -1,0 +1,131 @@
+# Helm chart: prometheus-community/kube-prometheus-stack
+#
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install kube-prom prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace \
+#     -f infra/manual/helm/kube-prometheus-stack.yaml
+#
+# Note: AnalysisTemplate in argo rollouts queries this Prometheus at:
+#   http://kube-prom-prometheus.monitoring.svc.cluster.local:9090
+# That URL assumes release name `kube-prom` in namespace `monitoring`.
+
+fullnameOverride: kube-prom
+
+prometheus:
+  prometheusSpec:
+    retention: 7d                # keep 7 days of metrics
+    retentionSize: 8GB
+
+    # Auto-discover ServiceMonitor / PodMonitor in any namespace
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+
+    nodeSelector:
+      company: scg
+      project: mandatory
+      nodegroup: facilities
+
+  service:
+    type: ClusterIP              # exposed via port-forward or Ingress
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+    nodeSelector:
+      company: scg
+      project: mandatory
+      nodegroup: facilities
+
+grafana:
+  adminPassword: admin           # CHANGE ME for prod
+  defaultDashboardsTimezone: UTC
+
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+  service:
+    type: ClusterIP
+
+  persistence:
+    enabled: true
+    size: 2Gi
+
+  # Pre-provision useful dashboards by Grafana ID
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      jvm-micrometer:
+        gnetId: 4701
+        revision: 9
+        datasource: Prometheus
+      spring-boot:
+        gnetId: 11378
+        revision: 5
+        datasource: Prometheus
+      k8s-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+
+# kube-state-metrics + node-exporter come bundled and on by default — keep them
+nodeExporter:
+  enabled: true
+  # node-exporter is a DaemonSet — pin to facilities nodes only so we don't
+  # collect metrics from nodes outside this team's footprint.
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+kubeStateMetrics:
+  enabled: true
+
+# kube-state-metrics is a sub-chart — its nodeSelector lives one level deeper
+kube-state-metrics:
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+# Operator that manages Prometheus + Alertmanager CRDs
+prometheusOperator:
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities

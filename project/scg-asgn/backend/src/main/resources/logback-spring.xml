@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="ECS_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="co.elastic.logging.logback.EcsEncoder">
+            <serviceName>${spring.application.name:-scg-asgn-be}</serviceName>
+            <serviceVersion>${APP_VERSION:-dev}</serviceVersion>
+            <includeMarkers>true</includeMarkers>
+            <includeOrigin>false</includeOrigin>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="ECS_JSON"/>
+    </root>
+</configuration>

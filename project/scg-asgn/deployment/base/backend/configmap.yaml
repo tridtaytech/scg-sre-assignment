@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scg-asgn-be-config
+data:
+  APP_VERSION: "v0.1.0"
+  ROLLOUT_COLOR: "blue"
