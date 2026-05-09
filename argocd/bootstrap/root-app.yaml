@@ -14,7 +14,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/<OWNER>/scg-sre-assignment.git
+    repoURL: git@github.com:tridtaytech/scg-sre-assignment.git
     targetRevision: main
     path: argocd/managed
     directory:
