@@ -6,7 +6,7 @@ metadata:
 spec:
   description: scg-asgn — frontend + backend across all envs
   sourceRepos:
-    - https://github.com/<OWNER>/scg-sre-assignment.git
+    - https://github.com/tridtaytech/scg-sre-assignment.git
   destinations:
     - namespace: 'app-*'
       server: https://kubernetes.default.svc
