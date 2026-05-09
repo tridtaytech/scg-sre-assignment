@@ -29,7 +29,7 @@ spec:
     spec:
       project: scg-asgn
       source:
-        repoURL: git@github.com:tridtaytech/scg-sre-assignment.git
+        repoURL: https://github.com/tridtaytech/scg-sre-assignment.git
         targetRevision: main
         path: 'project/scg-asgn/deployment/overlays/{{.env}}'
       destination:
