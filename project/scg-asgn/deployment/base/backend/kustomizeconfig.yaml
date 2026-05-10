@@ -1,9 +1,10 @@
 # Teaches kustomize how to handle Argo Rollouts CRDs:
-#  - rewrite name references when nameSuffix is applied
+#  - rewrite name references when nameSuffix is applied (Service, AnalysisTemplate, ConfigMap, Secret)
 #  - allow `replicas:` transformer to target a Rollout
 #  - apply commonLabels (and commonAnnotations) into Rollout selector + pod template
 
 nameReference:
+  # Service references in Rollout strategy
   - kind: Service
     fieldSpecs:
       - kind: Rollout
@@ -12,6 +13,8 @@ nameReference:
       - kind: Rollout
         group: argoproj.io
         path: spec/strategy/blueGreen/previewService
+
+  # AnalysisTemplate references inside the strategy
   - kind: AnalysisTemplate
     group: argoproj.io
     fieldSpecs:
@@ -21,6 +24,50 @@ nameReference:
       - kind: Rollout
         group: argoproj.io
         path: spec/strategy/blueGreen/postPromotionAnalysis/templates/templateName
+
+  # ConfigMap references in pod spec (mirrors the built-in transformer for Deployment)
+  - kind: ConfigMap
+    fieldSpecs:
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/containers/envFrom/configMapRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/initContainers/env/valueFrom/configMapKeyRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/initContainers/envFrom/configMapRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/volumes/configMap/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/volumes/projected/sources/configMap/name
+
+  # Secret references in pod spec (same pattern as ConfigMap)
+  - kind: Secret
+    fieldSpecs:
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/containers/envFrom/secretRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/initContainers/env/valueFrom/secretKeyRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/initContainers/envFrom/secretRef/name
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/volumes/secret/secretName
+      - kind: Rollout
+        group: argoproj.io
+        path: spec/template/spec/imagePullSecrets/name
 
 replicas:
   - kind: Rollout
