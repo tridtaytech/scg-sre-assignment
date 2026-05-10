@@ -5,6 +5,117 @@ Newest entries on top.
 
 ---
 
+## 2026-05-11 · AWS LBC `UnauthorizedOperation: ec2:DescribeRouteTables`
+**Symptom:** Reconciler error: `failed to list subnets by reachability: ec2:DescribeRouteTables ... UnauthorizedOperation`. NLB never gets created.
+**Cause:** The role's attached IAM policy was missing the action. Original `create-aws-lbc-iam` run had silently failed (URL had whitespace in `AWS_LBC_VERSION`), so the role existed but the policy attached to it was either an old/incomplete version or never updated to a complete one. AWS IAM also caps managed policies at 5 versions — `aws iam create-policy-version` fails silently when the limit is hit.
+**Fix:**
+- Bumped `AWS_LBC_VERSION` to `v2.13.0` (has DescribeRouteTables and the modern subnet-reachability perms).
+- Hardened `create-aws-lbc-iam`: pre-deletes non-default policy versions to avoid the 5-version limit, refuses empty policy file, and explicitly logs the policy ARN written.
+**Files:** `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · `loadBalancerClass: may not change once set`
+**Symptom:** `helm upgrade ingress-nginx` failed: `Service "ingress-nginx-controller" is invalid: spec.loadBalancerClass: Invalid value: "service.k8s.aws/nlb": may not change once set`.
+**Cause:** Existing Service was created with `eks.amazonaws.com/nlb`; switching the class is immutable in Kubernetes.
+**Fix:** One-time `kubectl -n ingress-nginx delete svc ingress-nginx-controller` so helm recreates the Service with the new class. NGINX pods keep running through the brief gap — only the Service / LB record is recreated.
+**Files:** none (cluster operation).
+
+---
+
+## 2026-05-11 · NGINX Service stuck — switched to `service.k8s.aws/nlb`
+**Symptom:** `ingress-nginx-controller` Service had `loadBalancerClass: eks.amazonaws.com/nlb` set automatically (EKS Auto Mode default), but no controller for that class was provisioning the LB → `status.loadBalancer: {}` forever.
+**Cause:** Cluster wasn't on EKS Auto Mode. The auto-set class had no responsible controller.
+**Fix:** Installed AWS Load Balancer Controller (`make install-aws-lbc`) and pinned the NGINX Service to its class: `loadBalancerClass: service.k8s.aws/nlb`. Also added `nlb-target-type: ip` annotation (preferred for AWS LBC).
+**Files:** `infra/manual/helm/nginx-ingress.yaml`.
+
+---
+
+## 2026-05-11 · AWS LBC pod: `failed to fetch VPC ID from instance metadata`
+**Symptom:** AWS Load Balancer Controller pod logs: `unable to initialize AWS cloud … failed to fetch VPC ID from instance metadata: … context deadline exceeded`.
+**Cause:** The controller reads VPC ID from EC2 IMDS by default. EKS managed nodes have IMDS hop limit = 1, blocking pods (without `hostNetwork`) from reaching `169.254.169.254`.
+**Fix:** Pass `vpcId` to the chart explicitly via `--set vpcId=$(aws eks describe-cluster ... --query 'cluster.resourcesVpcConfig.vpcId')`. Updated `install-aws-lbc` to fetch + inject it.
+**Files:** `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · `AWS_LBC_VERSION` had trailing whitespace, and helm-repos still failed
+**Symptom:** Two stacked errors:
+1. `curl: (56) The requested URL returned error: 400` and `curl: (3) URL rejected: No host part in the URL` — `AWS_LBC_VERSION` resolved to `"v2.7.2     "` (5 trailing spaces) so the URL contained spaces.
+2. `helm repo update` still failed on a stale `vitess` third-party repo despite earlier "tolerant" attempt — the `--fail-on-repo-update-fail=false` flag isn't supported by their helm version.
+**Cause:**
+1. Make includes trailing whitespace between value and inline `#` comment as part of the variable. `AWS_LBC_VERSION := v2.7.2     # tag …` → variable is `v2.7.2     ` with spaces.
+2. Plain `helm repo update` is global — fails fast if any registered repo is broken, regardless of source.
+**Fix:**
+1. Moved the comment to its own line, leaving `AWS_LBC_VERSION := v2.7.2` clean.
+2. Switched to **named** repo update — `helm repo update ingress-nginx argo metrics-server prometheus-community jetstack grafana fluent eks`. Only updates repos we own; unrelated third-party repos are ignored.
+**Files:** `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · `helm repo update` failed on a stale third-party repo
+**Symptom:** `make helm-repos` errored: `failed to update the following repositories: [https://raw.githubusercontent.com/.../vitess-operator]`. Aborts the whole target so no install can run.
+**Cause:** `helm repo` state on the user's machine had a leftover repo (vitess) added by an earlier project. `helm repo update` runs across **all** registered repos and fails fast if any one is unreachable.
+**Fix:** Made `helm-repos` tolerant of failures with `--fail-on-repo-update-fail=false`, falling back to a plain `helm repo update || true`. Added `helm-repos-clean` target that auto-detects and removes the first failing repo. Manual cleanup remains: `helm repo remove <name>`.
+**Files:** `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · Added AWS Load Balancer Controller install path
+**Symptom:** NGINX Service stuck with `status.loadBalancer: {}` — `loadBalancerClass: eks.amazonaws.com/nlb` was set but no controller was provisioning the LB. Cluster is not in EKS Auto Mode.
+**Cause:** N/A — addition, not a fix per se. Vanilla EKS clusters need AWS Load Balancer Controller to handle modern LB classes.
+**Fix:**
+- Added `infra/manual/iam/aws-lbc-trust.json.tpl` — IRSA trust scoped to `kube-system:aws-load-balancer-controller`.
+- Added `infra/manual/helm/aws-load-balancer-controller.yaml` — helm values pinned to facilities nodes.
+- Added Make targets `create-aws-lbc-iam` (downloads upstream `iam_policy.json` for `v2.7.2`, creates IAM role + policy) and `install-aws-lbc` (helm install with role ARN).
+- After install, change Service `loadBalancerClass: eks.amazonaws.com/nlb` → `service.k8s.aws/nlb` to route through this controller.
+**Files:** `infra/manual/iam/aws-lbc-trust.json.tpl`, `infra/manual/helm/aws-load-balancer-controller.yaml`, `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · Per-env Ingress `/api` backend referenced unsuffixed Service
+**Symptom:** Rendered Ingress had `backend.service.name: scg-asgn-be-active` (no env suffix). FE pods reach `/api/*` via the Ingress proxy, so this would break in cluster.
+**Cause:** The FE overlay only includes `base/frontend`, so kustomize doesn't see the BE Service in the same kustomization and can't rewrite the name reference. Same root as the BACKEND_URL ConfigMap issue.
+**Fix:** Each overlay's `ingress-host.yaml` patch now also has an `op: replace` for `/spec/rules/0/http/paths/0/backend/service/name` with the env-suffixed value.
+**Files:** `project/scg-asgn/deployment/overlays/{dev,qa,staging,prod}/frontend/ingress-host.yaml`.
+
+---
+
+## 2026-05-11 · `make install-fluent-bit: repo fluent not found`
+**Symptom:** `Error: repo fluent not found` when running `install-fluent-bit` directly without `make helm-repos` first.
+**Cause:** Install targets assumed the helm repos were already added. New users hit this on first run.
+**Fix:** Added `helm-repos` as a Make dependency to every `install-<tool>` target — running any of them now self-heals by adding/updating the repos first.
+**Files:** `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · Loki PVC `unbound — must define a storage class`
+**Symptom:** `Failed to schedule pod, unbound pvc must define a storage class (PersistentVolumeClaim=logging/storage-loki-0, StorageClass=)`.
+**Cause:** Cluster had no `gp3` StorageClass and the chart's `singleBinary.persistence` didn't set one explicitly.
+**Fix:** Added `infra/manual/storage/gp3-storageclass.yaml` (gp3, encrypted, ext4, default) and `make create-gp3-sc` target. Updated `loki.yaml` to set `singleBinary.persistence.storageClass: gp3`. Requires the EBS CSI driver in `kube-system` (default on EKS managed addons).
+**Files:** `infra/manual/storage/gp3-storageclass.yaml`, `infra/manual/helm/loki.yaml`, `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · `make create-loki-iam` HEREDOC syntax error
+**Symptom:** `/bin/sh: -c: line 1: syntax error: unexpected end of file` on `make create-loki-iam`.
+**Cause:** Make runs each line of a recipe in its own shell unless lines are joined with `;` and `\`. The `cat <<EOF ... EOF` HEREDOC was split across multiple shells — the second shell never saw `EOF`.
+**Fix:** Replaced inline HEREDOC JSON with template files at `infra/manual/iam/loki-{trust,policy}.json.tpl` (with `__PLACEHOLDER__` markers). Recipe now uses `sed` to render templates, all on one shell command via `\`-joined lines.
+**Files:** `infra/manual/iam/loki-trust.json.tpl`, `infra/manual/iam/loki-policy.json.tpl`, `infra/manual/makefile`.
+
+---
+
+## 2026-05-11 · Loki on EKS — switched from filesystem to S3 + IRSA
+**Symptom:** Filesystem storage doesn't survive pod restarts cleanly and isn't shareable across replicas; production-grade pattern on EKS is S3-backed chunks with IRSA for auth.
+**Cause:** N/A — design improvement, not a bug.
+**Fix:**
+- `loki.yaml`: switched `storage.type: s3` with `bucketNames` + `s3.region`, added `serviceAccount.annotations.eks.amazonaws.com/role-arn`. Reduced PVC to 5Gi (just WAL/index; chunks live in S3).
+- Added Make targets: `eks-oidc-register` (idempotent registration of EKS OIDC provider in IAM), `create-loki-s3` (versioned + public-access-blocked bucket), `create-loki-iam` (role with trust policy scoped to `system:serviceaccount:logging:loki` and a least-privilege S3 policy on the bucket only).
+- `install-logging` now chains: OIDC register → bucket → IAM → Loki → Fluent Bit.
+**Files:** `infra/manual/helm/loki.yaml`, `infra/manual/makefile`.
+
+---
+
 ## 2026-05-10 · `configmap "scg-asgn-be-config" not found` (no env suffix)
 **Symptom:** BE pod fails to start: `configmap "scg-asgn-be-config" not found`. Actual ConfigMap is `scg-asgn-be-config-dev`.
 **Cause:** Same root as the previous Rollout fixes — kustomize knows how to rewrite `configMapKeyRef.name` for native Deployments but not for the `Rollout` CRD, so the suffix wasn't applied to refs inside `spec.template.spec.containers[].env[].valueFrom.configMapKeyRef.name`.

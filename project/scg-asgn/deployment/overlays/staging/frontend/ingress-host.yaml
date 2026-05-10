@@ -1,3 +1,19 @@
+# letsencrypt-prod from staging onwards — real certs.
 - op: replace
   path: /spec/rules/0/host
-  value: app1.staging.example.com
+  value: staging.gpevn.com
+
+- op: replace
+  path: /spec/rules/0/http/paths/0/backend/service/name
+  value: scg-asgn-be-active-staging
+
+- op: add
+  path: /metadata/annotations/cert-manager.io~1cluster-issuer
+  value: letsencrypt-prod
+
+- op: add
+  path: /spec/tls
+  value:
+    - hosts:
+        - staging.gpevn.com
+      secretName: scg-asgn-tls

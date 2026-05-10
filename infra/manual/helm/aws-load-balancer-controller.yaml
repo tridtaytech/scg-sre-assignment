@@ -1,0 +1,34 @@
+# Helm chart: eks/aws-load-balancer-controller
+#
+#   helm repo add eks https://aws.github.io/eks-charts
+#   helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+#     --namespace kube-system \
+#     -f infra/manual/helm/aws-load-balancer-controller.yaml \
+#     --set clusterName=<cluster> \
+#     --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<role-arn>
+#
+# clusterName + role ARN are passed via --set in the Make target so this file
+# stays cluster-agnostic.
+
+# Use IRSA — don't create a SA in the chart unless we annotate it correctly
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+nodeSelector:
+  company: scg
+  project: mandatory
+  nodegroup: facilities
+
+# Pin to the controller's preferred LB class. After install, set this on
+# Services that should use AWS LBC (instead of `eks.amazonaws.com/nlb`).
+defaultLoadBalancerClass: service.k8s.aws/nlb

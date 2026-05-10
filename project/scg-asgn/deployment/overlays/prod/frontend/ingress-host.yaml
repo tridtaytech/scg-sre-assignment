@@ -1,3 +1,18 @@
 - op: replace
   path: /spec/rules/0/host
-  value: app1.example.com
+  value: gpevn.com
+
+- op: replace
+  path: /spec/rules/0/http/paths/0/backend/service/name
+  value: scg-asgn-be-active-prod
+
+- op: add
+  path: /metadata/annotations/cert-manager.io~1cluster-issuer
+  value: letsencrypt-prod
+
+- op: add
+  path: /spec/tls
+  value:
+    - hosts:
+        - gpevn.com
+      secretName: scg-asgn-tls

@@ -1,0 +1,35 @@
+# Apply AFTER cert-manager is up:
+#   kubectl apply -f infra/manual/helm/cert-manager-clusterissuer.yaml
+#
+# Two issuers — staging for testing (no rate limits), prod for real certs.
+# Update the email below before applying.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: trid@example.com         # CHANGE ME
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: trid@example.com         # CHANGE ME
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

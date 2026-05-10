@@ -1,3 +1,22 @@
+# Per-env Ingress patch: host, TLS, cert-manager issuer, and the /api backend
+# Service name (must include env suffix since the BE Service lives in a sibling
+# overlay that this kustomization can't see).
+
 - op: replace
   path: /spec/rules/0/host
-  value: app1.dev.example.com
+  value: dev.gpevn.com
+
+- op: replace
+  path: /spec/rules/0/http/paths/0/backend/service/name
+  value: scg-asgn-be-active-dev
+
+- op: add
+  path: /metadata/annotations/cert-manager.io~1cluster-issuer
+  value: letsencrypt-staging
+
+- op: add
+  path: /spec/tls
+  value:
+    - hosts:
+        - dev.gpevn.com
+      secretName: scg-asgn-tls

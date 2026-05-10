@@ -1,0 +1,24 @@
+# Apply with:  kubectl apply -f infra/manual/storage/gp3-storageclass.yaml
+#
+# Provisioner is the AWS EBS CSI driver (ebs.csi.aws.com). Requires the
+# CSI driver pods to be running in kube-system; check with:
+#   kubectl -n kube-system get pods | grep ebs-csi-controller
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  # Make this the cluster default. Comment out if you don't want to override.
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+  fsType: ext4
+  # gp3 defaults: 3000 IOPS, 125 MiB/s — uncomment to tune
+  # iops: "3000"
+  # throughput: "125"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete

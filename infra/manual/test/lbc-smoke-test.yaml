@@ -1,0 +1,53 @@
+# Minimal LoadBalancer Service to test that AWS LBC is working.
+#
+#   kubectl apply  -f infra/manual/test/lbc-smoke-test.yaml
+#   kubectl get svc lbc-test -w        # wait for EXTERNAL-IP to populate
+#   curl http://<external-ip>/         # should return nginx welcome page
+#   kubectl delete -f infra/manual/test/lbc-smoke-test.yaml
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lbc-test
+  labels: { app: lbc-test }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: lbc-test }
+  template:
+    metadata:
+      labels: { app: lbc-test }
+    spec:
+      nodeSelector:
+        company: scg
+        project: mandatory
+        nodegroup: facilities
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - { containerPort: 80, name: http }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits:   { memory: 32Mi }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lbc-test
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+spec:
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: lbc-test
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

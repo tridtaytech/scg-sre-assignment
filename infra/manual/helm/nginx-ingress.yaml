@@ -12,11 +12,14 @@ controller:
 
   service:
     type: LoadBalancer
+    # Route through the AWS Load Balancer Controller (installed via
+    # `make install-aws-lbc`). The controller watches Services with this
+    # class and provisions an NLB pointing at the controller pods.
+    loadBalancerClass: service.k8s.aws/nlb
     annotations:
-      # AWS NLB — cheaper + lower-latency than classic ELB, native on EKS
-      service.beta.kubernetes.io/aws-load-balancer-type: nlb
-      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
       service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
 
   config:
     use-forwarded-headers: "true"

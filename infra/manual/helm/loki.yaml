@@ -1,0 +1,92 @@
+# Helm chart: grafana/loki (the unified chart, not legacy loki-stack)
+#
+#   helm repo add grafana https://grafana.github.io/helm-charts
+#   helm upgrade --install loki grafana/loki \
+#     --namespace logging --create-namespace \
+#     -f infra/manual/helm/loki.yaml
+#
+# SingleBinary mode + S3 chunk storage via IRSA. Run the Make targets first:
+#   make create-loki-s3       (creates the bucket)
+#   make create-loki-iam      (creates the IAM role bound to the SA)
+# Then plug the role ARN into serviceAccount.annotations below.
+#
+# Fluent Bit ships logs to:  http://loki.logging.svc.cluster.local:3100/loki/api/v1/push
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false             # no multi-tenant — fine for take-home
+
+  commonConfig:
+    replication_factor: 1
+
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  storage:
+    type: s3
+    bucketNames:
+      chunks: scg-asgn-loki-340741165554
+      ruler:  scg-asgn-loki-340741165554
+      admin:  scg-asgn-loki-340741165554
+    s3:
+      region: ap-southeast-1
+      # No accessKeyId / secretAccessKey — IRSA injects credentials at runtime
+      s3ForcePathStyle: false
+      insecure: false
+
+  limits_config:
+    retention_period: 168h        # 7 days
+    allow_structured_metadata: true
+
+# Service account annotated with the IAM role ARN — Loki pods get S3 perms
+# via IRSA. Fill in <ACCOUNT_ID> after `make create-loki-iam` prints it.
+serviceAccount:
+  create: true
+  name: loki
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::340741165554:role/scg-asgn-loki-s3
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true                 # tiny PVC for WAL / index — chunks live in S3
+    size: 5Gi
+    storageClass: gp3             # EKS w/ EBS CSI driver. Apply via `make create-gp3-sc`
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  nodeSelector:
+    company: scg
+    project: mandatory
+    nodegroup: facilities
+
+# Turn off the scaled deployment modes
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Disable the extras you don't need for SingleBinary
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+test:
+  enabled: false
+lokiCanary:
+  enabled: false
