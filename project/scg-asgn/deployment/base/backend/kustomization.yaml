@@ -9,6 +9,10 @@ resources:
   - configmap.yaml
   - hpa.yaml
 
+# Teaches kustomize about Argo Rollouts CRDs (replicas, name refs)
+configurations:
+  - kustomizeconfig.yaml
+
 commonLabels:
   app.kubernetes.io/name: scg-asgn-be
   app.kubernetes.io/part-of: scg-asgn

@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-prod
+nameSuffix: -prod
+
+resources:
+  - ../../../base/backend
+
+images:
+  - name: backend:placeholder
+    newName: public.ecr.aws/c5a3w2d1/backend
+    newTag: PLACEHOLDER
+
+replicas:
+  - name: scg-asgn-be
+    count: 3
+
+patches:
+  - path: rollout-prod.yaml
+    target:
+      kind: Rollout
+      name: scg-asgn-be
+  - path: hpa-prod.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: scg-asgn-be

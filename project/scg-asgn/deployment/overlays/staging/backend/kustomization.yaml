@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-staging
+nameSuffix: -staging
+
+resources:
+  - ../../../base/backend
+
+images:
+  - name: backend:placeholder
+    newName: public.ecr.aws/c5a3w2d1/backend
+    newTag: PLACEHOLDER  # CD overwrites via `kustomize edit set image`
+
+replicas:
+  - name: scg-asgn-be
+    count: 2

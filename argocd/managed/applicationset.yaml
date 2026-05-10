@@ -7,23 +7,29 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-    - list:
-        elements:
-          - env: dev
-            prune: true
-            selfHeal: true
-          - env: qa
-            prune: true
-            selfHeal: true
-          - env: staging
-            prune: true
-            selfHeal: false      # don't auto-revert manual edits in staging
-          - env: prod
-            prune: false         # never prune in prod
-            selfHeal: false      # surface drift, don't hide it
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - env: dev
+                  prune: true
+                  selfHeal: true
+                - env: qa
+                  prune: true
+                  selfHeal: true
+                - env: staging
+                  prune: true
+                  selfHeal: false
+                - env: prod
+                  prune: false
+                  selfHeal: false
+          - list:
+              elements:
+                - svc: backend
+                - svc: frontend
   template:
     metadata:
-      name: 'scg-asgn-{{.env}}'
+      name: 'scg-asgn-{{.svc}}-{{.env}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
@@ -31,14 +37,11 @@ spec:
       source:
         repoURL: https://github.com/tridtaytech/scg-sre-assignment.git
         targetRevision: main
-        path: 'project/scg-asgn/deployment/overlays/{{.env}}'
+        path: 'project/scg-asgn/deployment/overlays/{{.env}}/{{.svc}}'
       destination:
         server: https://kubernetes.default.svc
         namespace: 'app-{{.env}}'
       syncPolicy:
-        # NOTE: per-env automated.{prune,selfHeal} are applied via
-        # templatePatch below — direct '{{...}}' here would render strings,
-        # which the CRD rejects (must be bool).
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true

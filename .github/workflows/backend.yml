@@ -129,7 +129,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Bump image tag in overlay
-        working-directory: project/scg-asgn/deployment/overlays/${{ steps.vars.outputs.env }}
+        working-directory: project/scg-asgn/deployment/overlays/${{ steps.vars.outputs.env }}/backend
         run: |
           kustomize edit set image \
             backend:placeholder=$ECR_REGISTRY/${{ env.SERVICE }}:${{ steps.vars.outputs.tag }}

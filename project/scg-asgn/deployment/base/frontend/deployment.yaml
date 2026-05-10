@@ -26,6 +26,20 @@ spec:
                 configMapKeyRef:
                   name: scg-asgn-fe-config
                   key: NEXT_PUBLIC_APP_VERSION
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: scg-asgn-fe-config
+                  key: BACKEND_URL
+            - name: ROLLOUT_COLOR
+              valueFrom:
+                configMapKeyRef:
+                  name: scg-asgn-fe-config
+                  key: ROLLOUT_COLOR
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           readinessProbe:
             httpGet:
               path: /

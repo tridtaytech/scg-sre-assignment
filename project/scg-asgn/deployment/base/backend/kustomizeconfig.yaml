@@ -1,5 +1,7 @@
-# Teaches kustomize how to update name references inside Argo Rollouts CRDs
-# when nameSuffix / namePrefix is applied at the overlay layer.
+# Teaches kustomize how to handle Argo Rollouts CRDs:
+#  - rewrite name references when nameSuffix is applied
+#  - allow `replicas:` transformer to target a Rollout
+
 nameReference:
   - kind: Service
     fieldSpecs:
@@ -18,3 +20,9 @@ nameReference:
       - kind: Rollout
         group: argoproj.io
         path: spec/strategy/blueGreen/postPromotionAnalysis/templates/templateName
+
+replicas:
+  - kind: Rollout
+    group: argoproj.io
+    path: spec/replicas
+    create: true

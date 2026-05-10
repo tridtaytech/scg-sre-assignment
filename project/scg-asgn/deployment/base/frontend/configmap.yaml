@@ -4,3 +4,8 @@ metadata:
   name: scg-asgn-fe-config
 data:
   NEXT_PUBLIC_APP_VERSION: "v0.1.0"
+  ROLLOUT_COLOR: "blue"
+  # Hostname is rewritten per-overlay by kustomize `replacements` in
+  # base/kustomization.yaml — it picks up the env-suffixed Service name
+  # automatically. Default port 80 is implicit.
+  BACKEND_URL: "http://scg-asgn-be-active"

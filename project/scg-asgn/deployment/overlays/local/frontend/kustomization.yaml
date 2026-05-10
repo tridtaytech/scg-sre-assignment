@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-local
+nameSuffix: -local
+
+resources:
+  - ../../../base/frontend
+
+images:
+  - name: frontend:placeholder
+    newName: frontend
+    newTag: local
+
+replicas:
+  - name: scg-asgn-fe
+    count: 1
+
+patches:
+  - path: backend-url.yaml
+    target:
+      kind: ConfigMap
+      name: scg-asgn-fe-config

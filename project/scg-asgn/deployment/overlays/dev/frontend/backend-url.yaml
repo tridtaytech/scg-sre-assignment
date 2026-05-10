@@ -1,0 +1,3 @@
+- op: replace
+  path: /data/BACKEND_URL
+  value: http://scg-asgn-be-active-dev
