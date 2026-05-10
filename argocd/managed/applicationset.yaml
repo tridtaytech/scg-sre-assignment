@@ -36,9 +36,15 @@ spec:
         server: https://kubernetes.default.svc
         namespace: 'app-{{.env}}'
       syncPolicy:
-        automated:
-          prune: '{{.prune}}'
-          selfHeal: '{{.selfHeal}}'
+        # NOTE: per-env automated.{prune,selfHeal} are applied via
+        # templatePatch below — direct '{{...}}' here would render strings,
+        # which the CRD rejects (must be bool).
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+  templatePatch: |
+    spec:
+      syncPolicy:
+        automated:
+          prune: {{ .prune }}
+          selfHeal: {{ .selfHeal }}
