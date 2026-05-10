@@ -5,19 +5,19 @@ namespace: app-dev
 nameSuffix: -dev
 
 resources:
-  - ../../../base/backend
+- ../../../base/backend
 
 images:
-  - name: backend:placeholder
-    newName: public.ecr.aws/c5a3w2d1/backend
-    newTag: PLACEHOLDER
+- name: backend:placeholder
+  newName: public.ecr.aws/c5a3w2d1/backend
+  newTag: b025ac36b352
 
 replicas:
-  - name: scg-asgn-be
-    count: 1
+- count: 1
+  name: scg-asgn-be
 
 patches:
-  - path: disable-analysis.yaml
-    target:
-      kind: Rollout
-      name: scg-asgn-be
+- path: disable-analysis.yaml
+  target:
+    kind: Rollout
+    name: scg-asgn-be
