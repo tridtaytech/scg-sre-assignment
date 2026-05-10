@@ -5,23 +5,23 @@ namespace: app-dev
 nameSuffix: -dev
 
 resources:
-  - ../../../base/frontend
+- ../../../base/frontend
 
 images:
-  - name: frontend:placeholder
-    newName: public.ecr.aws/c5a3w2d1/frontend
-    newTag: PLACEHOLDER
+- name: frontend:placeholder
+  newName: public.ecr.aws/c5a3w2d1/frontend
+  newTag: b025ac36b352
 
 replicas:
-  - name: scg-asgn-fe
-    count: 1
+- count: 1
+  name: scg-asgn-fe
 
 patches:
-  - path: ingress-host.yaml
-    target:
-      kind: Ingress
-      name: scg-asgn
-  - path: backend-url.yaml
-    target:
-      kind: ConfigMap
-      name: scg-asgn-fe-config
+- path: ingress-host.yaml
+  target:
+    kind: Ingress
+    name: scg-asgn
+- path: backend-url.yaml
+  target:
+    kind: ConfigMap
+    name: scg-asgn-fe-config
