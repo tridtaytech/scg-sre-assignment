@@ -1,6 +1,7 @@
 # Teaches kustomize how to handle Argo Rollouts CRDs:
 #  - rewrite name references when nameSuffix is applied
 #  - allow `replicas:` transformer to target a Rollout
+#  - apply commonLabels (and commonAnnotations) into Rollout selector + pod template
 
 nameReference:
   - kind: Service
@@ -25,4 +26,20 @@ replicas:
   - kind: Rollout
     group: argoproj.io
     path: spec/replicas
+    create: true
+
+commonLabels:
+  - kind: Rollout
+    group: argoproj.io
+    path: spec/selector/matchLabels
+    create: true
+  - kind: Rollout
+    group: argoproj.io
+    path: spec/template/metadata/labels
+    create: true
+
+commonAnnotations:
+  - kind: Rollout
+    group: argoproj.io
+    path: spec/template/metadata/annotations
     create: true
